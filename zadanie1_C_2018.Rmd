@@ -1,0 +1,179 @@
+---
+title: "Prognoza stopy bezrobocia w roku 2018"
+author: "Agnieszka Jadczak"
+date: "9 maja 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(zoo)
+library(forecast)
+library(dplyr)
+library(stats)
+library(tseries)
+```
+
+
+## Wczytanie danych 
+
+Dane pochodzą ze strony Głównego Urzędu Statystycznego.
+  
+Okres z którego pochodzą dane: styczeń 1990 - grudzień 2018. 
+
+```{r}
+options(max.print = 99999999) 
+bezrobocie<-read.csv2(file="dane2018.csv", header = TRUE, sep = ";", dec = ",")
+```
+
+
+```{r}
+b=ts(bezrobocie$kolumna, start=1990, frequency=12)
+b
+```
+
+```{r}
+plot(b, main = "Stopa bezrobocia w Polsce w latach 1990-2018", ylab = "Stopa bezrobocia",xlab = "Lata")
+```
+
+
+```{r}
+tsdisplay(b)
+```
+
+
+Wyraźnie możemy zauważyć, że szereg nie jest stacjonarny.  
+Sprawdźmy stacjonarność tego szeregu poprzez poniższy test statystyczny.
+```{r}
+
+adf.test(b, alternative = "stationary")
+
+```
+Widać że p-value > 0.05 zatem nie możemy przyjąć hipotezy alternatywnej mówiącej o tym, że szereg jest stacjonarny.
+
+## Badanie sezonowości i trendu
+
+```{r}
+seasonplot ( b, col = rainbow (23),year.labels = TRUE)
+```
+
+
+```{r}
+b.dekomp <- decompose(b)
+plot(b.dekomp)
+```
+
+Zastosujemy zatem różnicowanie dla tego szeregu.
+```{r}
+b1<-diff(b)
+tsdisplay(b1)
+```
+
+```{r}
+adf.test(b1, alternative = "stationary")
+```
+
+Na podstawie wykresów oraz testu statystycznego, możemy wnioskować że ten szereg jest już stacjonarny.
+Z wykresu ACF możemy odczytać, że q=14, z wykresu PACF odczytujemy, że p=9.
+Ponieważ różnicowaliśmy szereg, więc d=1.
+
+```{r}
+p<-9
+q<-14
+d<-1
+```
+
+## Podział na zbiór uczący i testowy
+
+```{r}
+train<-window(b1,end= c(2017,12))
+test<-window(b1,start=c(2018,1))
+```
+
+
+```{r}
+ts.plot(train, test, col=1:2, lty=c(1,2))
+```
+
+##MODELE
+
+## MODEL AR(p)
+
+```{r}
+AR<-arima(train, c(p,d,0))
+summary(AR)
+```
+
+## MODEL MA(q)
+```{r}
+MA<-arima(train, c(0,d,q))
+summary(MA)
+```
+
+## MODEL ARIMA
+```{r}
+ARIMA<- auto.arima(train)
+summary(ARIMA)
+```
+
+## TRANSFORMACJA BOXA-COXA
+
+Zastosujemy również transformację Boxa-Coxa, która ma na celu przybliżyć rozkład do rozkładu normalnego. 
+
+```{r message=FALSE, warning=FALSE}
+lambda = BoxCox.lambda(train)
+lambda
+bc<-BoxCox(train, lambda= 1)
+testbc<-BoxCox(test,lambda=1)
+BC <- auto.arima(bc)
+summary(BC)
+```
+
+
+## Prognozy
+
+## Prognoza dla modelu AR
+```{r}
+prognozaAR<-forecast(AR,h=length(test))
+plot(prognozaAR,type="l")
+lines(test, col="red")
+```
+
+
+## Prognoza dla modelu MA
+```{r}
+prognozaMA<-forecast(MA,h=length(test))
+plot(prognozaMA,type="l")
+lines(test, col="red")
+```
+
+## Prognoza dla modelu ARIMA
+```{r}
+prognozaARIMA<-forecast(ARIMA,h=length(test))
+plot(prognozaARIMA,type="l")
+lines(test, col="red")
+```
+
+## Prognoza z modelem wykorzystuącym transformacje Boxa-Coxa
+```{r}
+prognozaBC<-forecast(BC,h=length(test))
+plot(prognozaBC,type="l")
+lines(testbc, col="red")
+```
+
+## BŁĘDY DLA ZAPROPONOWANYCH MODELI
+
+Błędy średniokwadratowe dla zaproponowanych predykcji.
+```{r}
+m1<-mean( (prognozaAR$mean - test)^2, na.rm = TRUE)
+m2<-mean( (prognozaMA$mean - test)^2, na.rm = TRUE)
+m3<-mean( (prognozaARIMA$mean - test)^2, na.rm = TRUE)
+m4<-mean( (prognozaBC$mean - test)^2, na.rm = TRUE)
+```
+
+Błąd średniokwadratowy dla prognozy AR wynosi `r m1`, dla MA wynosi `r m2`, natomiast dla ARIMA wynosi `r m3`, dla modelu wykorzystującego transformację BC wynosi `r m4`. 
+
+## WNIOSKI
+
+Transformacja Boxa-Coxa nie poprawiła prognozy dla ostatniego modelu.
+Wybieramy model MA, ponieważ dla tego modelu możemy zaobserować najmniejszy błąd prognozy w stosunku do danych testowych.
