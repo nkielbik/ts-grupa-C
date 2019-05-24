@@ -1,0 +1,213 @@
+---
+title: "Zadanie 6"
+author: "Joanna Kamińska"
+date: "20 maja 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(zoo)
+library(dplyr)
+library(stats)
+library(forecast)
+library(tseries)
+library(stats)
+```
+
+## Dane dotyczą stopy bezrobocia w latach 1990-2019.
+
+```{r}
+dane_bezrobocie <- read.csv2("dane2019.csv")
+```
+
+```{r}
+dane=ts(dane_bezrobocie$kolumna , start=1990, frequency=12)
+dane
+```
+
+## Wykres dla powyższych danych
+
+```{r}
+plot(dane, 
+     type="l", 
+     lwd="2", 
+     col="red", 
+     main = "Stopa bezrobocia w Polsce w latach 1990-2019", 
+     ylab = "Stopa bezrobocia",
+     xlab = "Lata")
+```
+
+```{r}
+tsdisplay(dane)
+```
+
+Zatem możemy zauważyć, że szereg ten nie jest stacjonarny.
+
+Wykonajmy test statystyczny:
+
+```{r}
+adf.test(dane, alternative = "stationary")
+```
+
+Otrzymujemy, że p-value < 0.05, zatem nie możemy przyjąć hipotezy alternatywnej mówiącej o tym, że szereg jest stacjonarny.
+
+#Badanie sezonowości i trendu
+
+```{r}
+seasonplot (dane, col = rainbow (5),year.labels = TRUE, main = "Stopa bezrobocia w Polsce w latach 1990-2019", ylab = "Stopa bezrobocia",xlab = "Lata")
+```
+
+
+```{r}
+dane.dekomp <- decompose(dane)
+plot(dane.dekomp)
+```
+
+Zastosujemy zróżnicowanie: 
+
+```{r}
+dane1<-diff(dane)
+tsdisplay(dane1, main = "Wykres dla stacjonarnego szeregu czasowego (1990-2019)", xlab = "Lata", ylab = "Stopa bezrobocia")
+```
+
+```{r}
+adf.test(dane1, alternative = "stationary")
+```
+
+Z wykresu oraz testu statystycznego, w którym p-value < 0.05 mamy, że szereg jest już stacjonarny. 
+Z wykresu ACF możemy odczytać, że q=22, z wykresu PACF odczytujemy, że p=15, a d=1, ponieważ jeden raz różnicowaliśmy szereg.
+
+
+## Podział na zbiór uczący i testowy
+
+```{r}
+zb.train<-window(dane1,end= c(2018,12))
+zb.test<-window(dane1,start=c(2019,1))
+```
+
+```{r}
+ts.plot(zb.train, zb.test, col=1:2, lty=c(1,2))
+```
+
+
+##MODELE
+
+#AR
+
+```{r}
+AR<-arima(zb.train, c(15,1,0))
+summary(AR)
+```
+
+Prognoza dla modelu AR
+
+```{r}
+prognozaAR<-forecast(AR,h=12)
+```
+Wykres dla modelu AR 
+
+```{r}
+plot(prognozaAR,type="l", main = "Wykres prognozy dla modelu AR")
+lines(zb.test, col="blue")
+```
+
+
+
+
+#MA
+
+```{r}
+MA<-arima(zb.train, c(0,1,22))
+summary(MA)
+```
+Prognoza dla modelu MA
+
+```{r}
+prognozaMA<-forecast(MA,h=12)
+```
+
+Wykres dla modelu MA 
+
+```{r}
+plot(prognozaMA,type="l", main = "Wykres prognozy dla modelu MA")
+lines(zb.test, col="blue")
+```
+```{r}
+prognozaMA
+```
+
+
+# ARIMA
+
+```{r}
+ARIMA<-auto.arima(zb.train)
+summary(ARIMA)
+```
+Prognoza dla modelu ARIMA
+
+```{r}
+prognozaARIMA<-forecast(ARIMA,h=12)
+```
+
+Wykres dla modelu ARIMA 
+
+```{r}
+plot(prognozaARIMA,type="l", main = "Wykres prognozy dla modelu ARIMA")
+lines(zb.test, col="blue")
+```
+
+
+#Transformacja Boxa - Coxa
+
+```{r message=FALSE, warning=FALSE}
+lambda <- BoxCox.lambda(zb.train) 
+lambda
+```
+
+
+
+```{r}
+train_BC <- BoxCox(zb.train, lambda)
+test_BC <- BoxCox(zb.test, lambda)
+BC <- auto.arima(train_BC)
+summary(BC)
+```
+
+Predykcja dla transformacji Boxa - Coxa
+
+```{r}
+prognoza_BC <- forecast(BC, h=12)
+```
+
+Wykres dla tej prognozy
+
+```{r}
+plot(prognoza_BC,
+     main= "Wykres prognozy dla modelu BC",
+     xlab= "Dni")
+lines(zb.test, col="pink")
+```
+
+
+## Błędy średniokwadratowe
+
+
+```{r}
+mean1<- mean((prognozaAR$mean-zb.test)^2, na.rm = TRUE)
+mean2<- mean((prognozaMA$mean-zb.test)^2, na.rm = TRUE)
+mean3<- mean((prognozaARIMA$mean-zb.test)^2, na.rm = TRUE)
+mean4<- mean((prognoza_BC$mean-zb.test)^2, na.rm = TRUE)
+```
+
+```{r}
+mean1
+mean2
+mean3
+mean4
+```
+
+
+Najlepszy wydaje się być model AR, ponieważ błąd średniokwadratowy dla tej prognozy w stosunku do danych testowych jest najmniejszy.
+
