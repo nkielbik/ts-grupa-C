@@ -187,7 +187,7 @@ Wykres dla tej prognozy
 plot(prognoza_BC,
      main= "Wykres prognozy dla modelu BC",
      xlab= "Dni")
-lines(zb.test, col="pink")
+     lines(test_BC, col="green")
 ```
 
 
