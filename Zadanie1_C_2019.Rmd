@@ -130,7 +130,9 @@ Wykres dla modelu MA
 
 ```{r}
 plot(prognozaMA,type="l", main = "Wykres prognozy dla modelu MA")
+lines(zb.test, col="green")
 ```
+
 ```{r}
 prognozaMA
 ```
@@ -152,9 +154,8 @@ Wykres dla modelu ARIMA
 
 ```{r}
 plot(prognozaARIMA,type="l", main = "Wykres prognozy dla modelu ARIMA")
-lines(zb.test, col="blue")
+lines(zb.test, col="green")
 ```
-
 
 #Transformacja Boxa - Coxa
 
