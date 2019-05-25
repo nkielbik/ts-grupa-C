@@ -1,0 +1,239 @@
+---
+title: "Prognoza dot. stopy bezrobobocia w Polsce (2015)"
+author: "Natalia Kiełbik"
+date: "5 maja 2019"
+output: html_document
+---
+#Przygotowanie danych
+Dane dotyczą stopy bezrobocia w latach 1990-2019 i pochodzą ze [strony](https://stat.gov.pl/obszary-tematyczne/rynek-pracy/bezrobocie-rejestrowane/stopa-bezrobocia-rejestrowanego-w-latach-1990-2019,4,1.html).
+
+W tym modelu będziemy zajmować się danymi z przedziału **1990-2015**.
+
+Rozpoczniemy standardowo od wczytania potrzebnych bibliotek oraz wgrania danych.
+Następnie wgrane dane zamienimy na szereg czasowy. 
+
+```{r, message=FALSE}
+#Wgranie bibliotek
+library(dplyr)
+library(forecast)
+library(stats)
+library(tseries)
+```
+
+```{r}
+#Wczytanie danych
+dane <- read.csv2("dane2015.csv")
+
+#Zamiana danych w szereg czasowy
+szereg=ts(dane$Bezrobocie , start=1990, frequency=12)
+szereg
+```
+
+
+#Wykresy
+Przedstawimy 2 wykresy dla naszych danych.
+
+```{r}
+#Wykres punktowy
+plot(szereg,
+     type = "b",
+     col = "blue",
+     main = "Stopa bezrobocia w Polsce w latach 1990-2015",
+     ylab = "Stopa bezrobocia",xlab = "Lata")
+```
+
+```{r}
+#Wykres liniowy
+plot(szereg,
+     type = "l",
+     lwd = "2",
+     col = "purple",
+     main = "Stopa bezrobocia w Polsce w latach 1990-2015",
+     ylab = "Stopa bezrobocia",xlab = "Lata")
+```
+
+#Badanie sezonowości i trendu
+Rozpoczniemy od wykresu sezonowego dla naszych danych.
+
+```{r}
+#Wykres sezonowy
+seasonplot(szereg,
+           col = rainbow (25),
+           year.labels = TRUE,
+           main = "Stopa bezrobocia w Polsce w latach 1990-2015",
+           ylab = "Stopa bezrobocia",xlab = "Lata")
+```
+
+Teraz dokonamy dekompozycji dla naszych danych. Zaprezentujemy ją na wykresie.
+```{r}
+b_deko <- decompose(szereg)
+plot(b_deko)
+```
+
+
+#Stacjonarność danych
+```{r}
+tsdisplay(szereg,
+          main = "Wykres dla  szeregu czasowego (1990-2015)",
+          xlab = "Lata",
+          ylab = "Stopa bezrobocia")
+```
+
+Jak widać na powyższych wykresach - szereg ten nie jest stacjonarny. 
+W celu sprawdzenia stacjonarności naszego szeregu wykonamy test statystyczny **Dickeya-Fullera**.
+
+```{r}
+adf1 <- adf.test(szereg)
+adf1
+```
+
+Ponieważ nasze `p-value` wynosi 0.2711, to nie mamy podstaw do odrzucenia hipotezy odnośnie słabej stacjonarności. 
+Zróżnicujemy szereg i wykonamy test ponownie.
+
+```{r}
+adf2 <- adf.test(diff(szereg))
+adf2
+```
+Nasze `p-value` wynosi teraz 0.01, co oznacza, że żróżnicowany szereg jest teraz stacjonarny.
+
+Narysujemy raz jeszcze wykresy **ACF** i **PACF** dla szeregu stacjonarnego. 
+```{r}
+szereg1 <- diff(szereg)
+
+tsdisplay(szereg1,
+          main = "Wykres dla stacjonarnego szeregu czasowego (1990-2015)",
+          xlab = "Lata",
+          ylab = "Stopa bezrobocia")
+```
+
+Z wykresu oraz testu Dickeya-Fullera widzimy, że szereg ten jest stacjonarny.
+Ponadto, z wykresu **ACF** możemy odczytać wartość q=14 , natomiast z **PACF** p=9.
+Szereg był różnicowany tylko jeden raz, dlatego d=1.
+
+Dokonamy teraz podziału na **zbiór treningowy** oraz **testowy** i zaprezentujemy go na wykresie.
+```{r}
+zb_trening <- window(szereg1, end = c(2014,12))
+zb_test <- window(szereg1, start = c(2015,01))
+
+#Wykres
+ts.plot(zb_trening, zb_test, col=1:2,
+        main = "Zilustrowanie podziału na zbiory: treningowe i testowe",
+        xlab = "Lata")
+```
+
+
+#Model AR
+```{r}
+AR <- arima(zb_trening, order = c(9,0,0))
+summary(AR)
+```
+
+**Predykcja dla modelu AR**
+```{r}
+prognoza_AR <- forecast(AR, h=length(zb_test))
+```
+
+**Wykres dla tej prognozy**
+```{r}
+plot(prognoza_AR,
+     main= "Wykres prognozy dla modelu AR",
+     xlab= "Dni")
+lines(zb_test, col="dark blue")
+```
+
+
+#Model MA
+```{r}
+MA <- arima(zb_trening, order = c(0,0,14))
+summary(MA)
+```
+
+**Predykcja dla modelu MA**
+```{r}
+prognoza_MA <- forecast(MA, h=length(zb_test))
+```
+
+**Wykres dla tej prognozy**
+```{r}
+plot(prognoza_MA,
+     main= "Wykres prognozy dla modelu MA",
+     xlab= "Dni")
+lines(zb_test, col="purple")
+```
+
+
+#Model ARIMA
+```{r}
+ARIMA <- auto.arima(zb_trening)
+summary(ARIMA)
+```
+
+**Predykcja dla modelu ARIMA**
+```{r}
+prognoza_ARIMA <- forecast(ARIMA, h=length(zb_test))
+```
+
+**Wykres dla tej prognozy**
+```{r}
+plot(prognoza_ARIMA,
+     xlab= "Dni")
+lines(zb_test, col="red")
+```
+
+
+#Transformacja Boxa - Coxa
+```{r, warning=FALSE}
+lambda <- BoxCox.lambda(zb_trening)
+lambda
+```
+
+```{r}
+train_BC <- BoxCox(zb_trening, lambda = 1)
+test_BC <- BoxCox(zb_test, lambda = 1)
+BC <- auto.arima(train_BC)
+summary(BC)
+```
+
+**Predykcja dla transformacji Boxa - Coxa**
+```{r}
+prognoza_BC <- forecast(BC, h=length(zb_test))
+```
+
+**Wykres dla tej prognozy**
+```{r}
+plot(prognoza_BC,
+     main= "Wykres prognozy dla modelu BC",
+     xlab= "Dni")
+lines(test_BC, col="green")
+```
+
+
+#Podsumowanie 
+W ostatnim etapie obliczymy wartości średniokwadratowe dla zaproponowanych prognoz. Na ich podstawie wybierzemy najskuteczniejszy model. 
+```{r}
+#Błędy średniokwadratowe
+bl_MA <- mean(((prognoza_MA$mean - zb_test)^2))
+bl_AR <- mean(((prognoza_AR$mean - zb_test)^2))
+bl_ARIMA <- mean(((prognoza_ARIMA$mean - zb_test)^2))
+bl_tBC <- mean(((prognoza_BC$mean - zb_test)^2))
+```
+
+**Porównanie wartości:**
+```{r}
+#Model MA
+bl_MA
+
+
+#Model AR
+bl_AR
+
+#Model ARIMA
+bl_ARIMA
+
+#Transformacja Boxa-Coxa
+bl_tBC
+```
+
+Błędy średniokwadratowe dla rozważanych modeli prezentują się następująco:
+ARIMA < MA < AR < Box - Cox.
+Najlepszym wydaje się być model ARIMA, gdyż błąd prognozy w stosunku do danych testowych jest tutaj najmniejszy.
