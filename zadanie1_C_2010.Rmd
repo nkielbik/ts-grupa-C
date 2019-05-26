@@ -1,0 +1,160 @@
+---
+title: "Untitled"
+author: "Justyna Kapucińska"
+date: "25 maja 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(zoo)
+library(forecast)
+library(dplyr)
+library(stats)
+library(tseries)
+```
+
+# Wczytuje dane
+Dane dotyczą stopy bezrobocia w latach 1990-2010
+```{r}
+danep=read.csv2("dane2010.csv")
+```
+
+```{r}
+dane=ts(danep$kolumna, start = 1990, frequency = 12)
+dane
+```
+
+#Wykres
+```{r}
+plot(dane, main="Stopa bezrobocia w Polsce w latach 1990-2010",xlab="Lata",ylab="Stopa bezrobocia")
+```
+
+```{r}
+tsdisplay(dane)
+```
+
+Widzimy, że szereg nie jest stacjonarny.
+Wykonajmy test statystyczny.
+```{r}
+adf.test(dane,alternative="stationary")
+```
+
+Nie możemy przyjąć hipotezy alternatywnej mówiącej o tym, że szereg jest stacjonarny, ponieważ p-value>0.05.
+
+# Badanie sezonowości i trendu
+```{r}
+seasonplot(dane,col=rainbow(20), year.labels = TRUE, main="Stopa bezrobocia w Polsce w latach 1990-2010", xlab="Okres",ylab="Stopa bezrobocia")
+```
+
+```{r}
+dane.dekomp=decompose(dane)
+plot(dane.dekomp)
+```
+
+Zastosujemy zróżnicowanie.
+```{r}
+dane1=diff(dane)
+tsdisplay(dane1)
+```
+
+```{r}
+adf.test(dane1,alternative="stationary")
+```
+p-value<0.05 zatem szereg jest już stacjonarny.
+
+Z wykresu ACF możemy odczytać, że q=15, z wykresu PACF odczytujemy, że p=6, a d=1.
+
+# Podział na zbiór uczący i testowy
+```{r}
+train=window(dane1,end=c(2009,12))
+test=window(dane1,start=c(2010,1))
+```
+
+```{r}
+ts.plot(train,test,col=1:2,lty=c(1,2))
+```
+
+# Modele
+
+Model AR
+```{r}
+AR=arima(train,c(6,1,0))
+summary(AR)
+```
+
+Model MA
+```{r}
+MA=arima(train,c(0,1,15))
+summary(MA)
+```
+
+Model ARIMA
+```{r}
+ARIMA=auto.arima(train)
+summary(ARIMA)
+```
+
+
+# Transformacja BOXA-COXA
+
+```{r}
+lambda=BoxCox.lambda(train)
+lambda
+trainBC=BoxCox(train,lambda=1)
+testBC=BoxCox(test,lambda=1)
+BC=auto.arima(trainBC)
+summary(BC)
+```
+
+#Prognozy
+
+Prognoza dla modelu AR
+```{r}
+prognozaAR=forecast(AR,h=length(test))
+plot(prognozaAR,type="l")
+lines(test,col="red")
+```
+
+Prognoza dla modelu MA
+```{r}
+prognozaMA=forecast(MA,h=length(test))
+plot(prognozaMA,type="l")
+lines(test,col="red")
+```
+
+Prognoza dla modelu ARIMA
+```{r}
+prognozaARIMA=forecast(ARIMA,h=length(test))
+plot(prognozaARIMA,type="l")
+lines(test,col="red")
+```
+
+
+Prognoza z modelem wykorzystującym transformacje Boxa-Coxa
+```{r}
+prognozaBC=forecast(BC,h=length(test))
+plot(prognozaBC,type="l")
+lines(testBC,col="red")
+```
+
+
+# Błędy średniokwadratowe
+```{r}
+blAR=mean((prognozaAR$mean-test)^2,na.rm=TRUE)
+blMA=mean((prognozaMA$mean-test)^2,na.rm=TRUE)
+blARIMA=mean((prognozaARIMA$mean-test)^2,na.rm=TRUE)
+blBC=mean((prognozaBC$mean-test)^2,na.rm=TRUE)
+```
+
+```{r}
+blAR
+blMA
+blARIMA
+blBC
+```
+
+Wybieramy model ARIMA, ponieważ dla tego mogelu możemy zaobserwować najmniejszy błąd prognozy w stosunku do danych testowych.
