@@ -12,7 +12,7 @@ Dane dotyczą kursu **USD-PLN** i zostały one pobrane w formacie `csv` ze [stro
 Najpierw wczytamy dane, a następnie przygotujemy je do dalszej części analizy.
 W zadaniu tym bierzemy pod uwagę tylko jedną zmienną - **cenę zamknięcia**.
 Ostatni pomiar kursu zamknięcia pochodzi z dnia 21.05.2019r.
-W poniższej analizie postaramy się zadecydować czy w dniu 28.05.2019r. sprzedamy czy kupimy pewną ilość USD.
+W poniższej analizie postaramy się zadecydować czy w dniu 28.05.2019r. wymienimy  pewną ilość USD, zakupioną dnia 21.05.2019r., na PLN.
 
 ```{r setup, message=FALSE, warning=FALSE, include=FALSE}
 library(tseries)
@@ -245,6 +245,10 @@ plot(prognozaARMA3,type="l", main="Predykcja na kolejne 7 dni")
 prognozaARMA3
 ```
 
+```{r}
+sc1[98]
+```
+
 ## DECYZJA
 
-Ponieważ ostatnia wartość prognozy jest dodatnia(28.05), możemy przypuszczać, że kurs dolara wzrośnie w tym dniu. Korzystniej dla nas będzie wtedy sprzedać pewną ilość USD. 
+Ponieważ ostatnia wartość prognozy(28.05) jest mniejsza niż wartość zróżnicowanego szeregu dla 21.05, możemy przypuszczać, że kurs dolara będzie mniejszy w dniu 28.05 w stosunku do 21.05. Nie będziemy wymieniać USD na PLN.
