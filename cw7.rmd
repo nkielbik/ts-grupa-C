@@ -1,0 +1,250 @@
+---
+title: "Prognoza kursu USD-PLN na dzień 28.05.2019"
+author: "Natalia Kiełbik, Joanna Kamińska, Justyna Kapucińska, Agnieszka Jadczak"
+date: "22 maja 2019"
+output: html_document
+---
+
+#Wczytanie danych
+
+Dane dotyczą kursu **USD-PLN** i zostały one pobrane w formacie `csv` ze [strony](https://stooq.pl/q/d/?s=usdpln).
+
+Najpierw wczytamy dane, a następnie przygotujemy je do dalszej części analizy.
+W zadaniu tym bierzemy pod uwagę tylko jedną zmienną - **cenę zamknięcia**.
+Ostatni pomiar kursu zamknięcia pochodzi z dnia 21.05.2019r.
+W poniższej analizie postaramy się zadecydować czy w dniu 28.05.2019r. sprzedamy czy kupimy pewną ilość USD.
+
+```{r setup, message=FALSE, warning=FALSE, include=FALSE}
+library(tseries)
+library(forecast)
+library(dplyr)
+library(zoo)
+library(stats)
+
+```
+
+## Wczytanie danych
+```{r}
+dane = read.csv2("usdpln_d.csv",header = FALSE, dec = ".")
+```
+
+## Utworzenie szeregu czasowego
+```{r}
+sc <- ts(dane, frequency = 1)
+head(sc)
+length(sc)
+```
+
+
+```{r}
+plot(sc, main = "Kurs USD-PLN", ylab = "Kurs",xlab = "Dni")
+```
+
+
+```{r}
+tsdisplay(sc)
+```
+
+Sprawdźmy stacjonarność tego szeregu poprzez poniższy test statystyczny.
+```{r}
+
+adf.test(sc, alternative = "stationary")
+
+```
+
+Okazuje się, że wartśc p-value<0.05 zatem przyjmujemy hipotezę alternatywną, że badany szereg jest stacjonarny, tzn. nie mamy żadnej sezonowości ani trendów.
+
+Z wykresu ACF możemy odczytać, że q=14, z wykresu PACF odczytujemy, że p=2.
+Ponieważ nie różnicowaliśmy szeregu, więc d=0.
+
+Sprawdźmy jednak czy przy zastosowaniu różnicowania wyniki naszych predykcji się poprawią. Zbadamy również wybrane modele dla zróżnicowanego szeregu.
+```{r}
+sc1<-diff(sc)
+tsdisplay(sc1)
+```
+
+```{r, warning = FALSE}
+adf.test(sc1, alternative = "stationary")
+```
+Przyjmujemy hipotezę alternatywną, mówiącą o tym, że szereg jest stacjonarny.
+
+## Dopasowanie modelu 
+
+W celu stworzenia odpowiedniej prognozy, musimy na podstawie dostępnych danych dopasować odpowiedni model predykcyjny. Podzielimy dane na zbiór testowy i uczący oraz zbadamy modele AR, MA, ARMA i ARIMA.
+Na podstawie błędów średniokwadratowych wybierzemy odpowiedni model i na jego podstawie wygenerujemy prognozę na dzień 28.05.2019 r. oraz podejmiemy odpowiednią decyzję.
+
+Parametry modeli predykcyjnych dla szeregu bez różnicowania
+
+```{r}
+p<-2
+q<-14
+d<-0
+```
+
+Parametry modeli predykcyjnych dla szeregu po zróżnicowaniu
+```{r}
+p1<-1
+q1<-2
+d1<-1
+```
+
+## Podział na zbiór uczący i testowy
+
+```{r}
+train<-window(sc, end= 90)
+test<-window(sc,start=90)
+```
+
+##MODELE
+
+## MODEL AR(p)
+
+```{r}
+AR<-arima(train, c(p,d,0))
+summary(AR)
+```
+
+## MODEL MA(q)
+```{r}
+MA<-arima(train, c(0,d,q))
+summary(MA)
+```
+
+## MODEL ARMA
+```{r}
+ARMA<- arima(train, c(p,d,q))
+summary(ARMA)
+```
+
+## MODEL ARIMA
+```{r}
+ARIMA<- auto.arima(train)
+summary(ARIMA)
+```
+
+## Modele dla zróżnicowanego szeregu
+
+## MODEL AR
+```{r}
+AR1<-arima(train, c(p1,d1,0))
+summary(AR1)
+```
+
+## MODEL MA
+
+```{r}
+MA1<-arima(train, c(0,d1,q1))
+summary(MA1)
+```
+
+## MODEL ARMA
+
+```{r}
+ARMA1<- arima(train, c(p1,d1,q1))
+summary(ARMA1)
+```
+
+## Prognozy
+
+## Prognozy modelem AR
+```{r}
+prognozaAR<-forecast(AR,h=length(test)-1)
+plot(prognozaAR,type="l")
+lines(test)
+
+```
+
+```{r}
+prognozaAR1<-forecast(AR1,h=length(test)-1)
+plot(prognozaAR1,type="l", main = "Model AR dla zróżnicowanego szeregu")
+lines(test)
+```
+
+## Prognozy modelem MA
+```{r}
+prognozaMA<-forecast(MA,h=length(test)-1)
+plot(prognozaMA,type="l")
+lines(test)
+```
+
+```{r}
+prognozaMA1<-forecast(MA1,h=length(test)-1)
+plot(prognozaMA1,type="l", main="Model MA dla zróżnicowanego szeregu")
+lines(test)
+```
+
+## Prognozy modelem ARMA
+```{r}
+prognozaARMA<-forecast(ARMA,h=length(test)-1)
+plot(prognozaARMA,type="l")
+lines(test)
+```
+
+```{r}
+prognozaARMA1<-forecast(ARMA1,h=length(test)-1)
+plot(prognozaMA1,type="l", main="Model ARMA dla zróżnicowanego szeregu")
+lines(test)
+```
+
+## Prognoza modelem ARIMA
+```{r}
+prognozaARIMA<-forecast(ARIMA,h=length(test)-1)
+plot(prognozaARIMA,type="l")
+lines(test)
+```
+
+
+## BŁĘDY DLA ZAPROPONOWANYCH MODELI
+
+Błędy średniokwadratowe dla zaproponowanych predykcji.
+```{r}
+m1<-mean( (prognozaAR$mean - test)^2, na.rm = TRUE)
+m2<-mean( (prognozaMA$mean - test)^2, na.rm = TRUE)
+m3<-mean( (prognozaARMA$mean - test)^2, na.rm = TRUE)
+
+m4<-mean( (prognozaARIMA$mean - test)^2, na.rm = TRUE)
+
+m11<-mean( (prognozaAR1$mean - test)^2, na.rm = TRUE)
+m12<-mean( (prognozaMA1$mean - test)^2, na.rm = TRUE)
+m13<-mean( (prognozaARMA1$mean - test)^2, na.rm = TRUE)
+```
+
+Błąd średniokwadratowy dla prognozy AR wynosi `r m1`, dla MA wynosi `r m2`, natomiast dla ARMA wynosi `r m3`, dla modelu ARIMA wynosi `r m4`. 
+
+Błąd średniokwadratowy dla szeregu zróżnicowanego dla prognozy AR wynosi `r m11`, dla MA wynosi `r m12`, natomiast dla ARMA wynosi `r m13`.
+
+```{r}
+min(m1,m2,m3,m4,m11,m12,m13)
+```
+
+Najmniejszy błąd średniokwadratowy występuje przy użyciu modelu ARMA dla zróżnicowanego szeregu.Dlatego do rozwiązania naszego problemu i wygenerowania prognozy na 28.05.2019r. użyjemy tego modelu.
+
+## Prognoza na 28.05
+
+Musimy stworzyć nowy zbiór uczący i testowy, a zatem:
+
+
+```{r}
+train1<-window(sc1, end= 99)
+test1<-window(sc1,start=99)
+```
+
+```{r}
+ARMA2<- arima(train1, c(p1,d1,q1))
+summary(ARMA2)
+```
+
+Prognoza przy użyciu modelu ARMA po zróżnicowaniu szeregu.
+
+```{r}
+prognozaARMA3<-forecast(ARMA2,h=7)
+plot(prognozaARMA3,type="l", main="Predykcja na kolejne 7 dni")
+```
+
+```{r}
+prognozaARMA3
+```
+
+## DECYZJA
+
+Ponieważ ostatnia wartość prognozy jest dodatnia(28.05), możemy przypuszczać, że kurs dolara wzrośnie w tym dniu. Korzystniej dla nas będzie wtedy sprzedać pewną ilość USD. 
