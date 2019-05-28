@@ -57,17 +57,6 @@ Okazuje się, że wartśc p-value<0.05 zatem przyjmujemy hipotezę alternatywną
 Z wykresu ACF możemy odczytać, że q=14, z wykresu PACF odczytujemy, że p=2.
 Ponieważ nie różnicowaliśmy szeregu, więc d=0.
 
-Sprawdźmy jednak czy przy zastosowaniu różnicowania wyniki naszych predykcji się poprawią. Zbadamy również wybrane modele dla zróżnicowanego szeregu.
-```{r}
-sc1<-diff(sc)
-tsdisplay(sc1)
-```
-
-```{r, warning = FALSE}
-adf.test(sc1, alternative = "stationary")
-```
-Przyjmujemy hipotezę alternatywną, mówiącą o tym, że szereg jest stacjonarny.
-
 ## Dopasowanie modelu 
 
 W celu stworzenia odpowiedniej prognozy, musimy na podstawie dostępnych danych dopasować odpowiedni model predykcyjny. Podzielimy dane na zbiór testowy i uczący oraz zbadamy modele AR, MA, ARMA i ARIMA.
@@ -79,13 +68,6 @@ Parametry modeli predykcyjnych dla szeregu bez różnicowania
 p<-2
 q<-14
 d<-0
-```
-
-Parametry modeli predykcyjnych dla szeregu po zróżnicowaniu
-```{r}
-p1<-1
-q1<-2
-d1<-1
 ```
 
 ## Podział na zbiór uczący i testowy
@@ -122,28 +104,6 @@ ARIMA<- auto.arima(train)
 summary(ARIMA)
 ```
 
-## Modele dla zróżnicowanego szeregu
-
-## MODEL AR
-```{r}
-AR1<-arima(train, c(p1,d1,0))
-summary(AR1)
-```
-
-## MODEL MA
-
-```{r}
-MA1<-arima(train, c(0,d1,q1))
-summary(MA1)
-```
-
-## MODEL ARMA
-
-```{r}
-ARMA1<- arima(train, c(p1,d1,q1))
-summary(ARMA1)
-```
-
 ## Prognozy
 
 ## Prognozy modelem AR
@@ -154,12 +114,6 @@ lines(test)
 
 ```
 
-```{r}
-prognozaAR1<-forecast(AR1,h=length(test)-1)
-plot(prognozaAR1,type="l", main = "Model AR dla zróżnicowanego szeregu")
-lines(test)
-```
-
 ## Prognozy modelem MA
 ```{r}
 prognozaMA<-forecast(MA,h=length(test)-1)
@@ -167,22 +121,10 @@ plot(prognozaMA,type="l")
 lines(test)
 ```
 
-```{r}
-prognozaMA1<-forecast(MA1,h=length(test)-1)
-plot(prognozaMA1,type="l", main="Model MA dla zróżnicowanego szeregu")
-lines(test)
-```
-
 ## Prognozy modelem ARMA
 ```{r}
 prognozaARMA<-forecast(ARMA,h=length(test)-1)
 plot(prognozaARMA,type="l")
-lines(test)
-```
-
-```{r}
-prognozaARMA1<-forecast(ARMA1,h=length(test)-1)
-plot(prognozaMA1,type="l", main="Model ARMA dla zróżnicowanego szeregu")
 lines(test)
 ```
 
@@ -203,21 +145,15 @@ m2<-mean( (prognozaMA$mean - test)^2, na.rm = TRUE)
 m3<-mean( (prognozaARMA$mean - test)^2, na.rm = TRUE)
 
 m4<-mean( (prognozaARIMA$mean - test)^2, na.rm = TRUE)
-
-m11<-mean( (prognozaAR1$mean - test)^2, na.rm = TRUE)
-m12<-mean( (prognozaMA1$mean - test)^2, na.rm = TRUE)
-m13<-mean( (prognozaARMA1$mean - test)^2, na.rm = TRUE)
 ```
 
 Błąd średniokwadratowy dla prognozy AR wynosi `r m1`, dla MA wynosi `r m2`, natomiast dla ARMA wynosi `r m3`, dla modelu ARIMA wynosi `r m4`. 
 
-Błąd średniokwadratowy dla szeregu zróżnicowanego dla prognozy AR wynosi `r m11`, dla MA wynosi `r m12`, natomiast dla ARMA wynosi `r m13`.
-
 ```{r}
-min(m1,m2,m3,m4,m11,m12,m13)
+min(m1,m2,m3,m4)
 ```
 
-Najmniejszy błąd średniokwadratowy występuje przy użyciu modelu ARMA dla zróżnicowanego szeregu.Dlatego do rozwiązania naszego problemu i wygenerowania prognozy na 28.05.2019r. użyjemy tego modelu.
+Najmniejszy błąd średniokwadratowy występuje przy użyciu modelu ARIMA. Dlatego do rozwiązania naszego problemu i wygenerowania prognozy na 28.05.2019r. użyjemy tego modelu.
 
 ## Prognoza na 28.05
 
@@ -225,30 +161,29 @@ Musimy stworzyć nowy zbiór uczący i testowy, a zatem:
 
 
 ```{r}
-train1<-window(sc1, end= 99)
-test1<-window(sc1,start=99)
+train1<-window(sc, end= 99)
 ```
 
 ```{r}
-ARMA2<- arima(train1, c(p1,d1,q1))
-summary(ARMA2)
+A<- auto.arima(train1)
+summary(A)
 ```
 
 Prognoza przy użyciu modelu ARMA po zróżnicowaniu szeregu.
 
 ```{r}
-prognozaARMA3<-forecast(ARMA2,h=7)
-plot(prognozaARMA3,type="l", main="Predykcja na kolejne 7 dni")
+prognoza<-forecast(A,h=5)
+plot(prognoza,type="l", main="Predykcja na kolejne 7 dni")
 ```
 
 ```{r}
-prognozaARMA3
+prognoza
 ```
 
 ```{r}
-sc1[98]
+sc[98]
 ```
 
 ## DECYZJA
 
-Ponieważ ostatnia wartość prognozy(28.05) jest mniejsza niż wartość zróżnicowanego szeregu dla 21.05, możemy przypuszczać, że kurs dolara będzie mniejszy w dniu 28.05 w stosunku do 21.05. Nie będziemy wymieniać USD na PLN.
+Ponieważ ostatnia wartość prognozy(28.05) jest większa niż wartość kursu dla 21.05, możemy przypuszczać, że kurs dolara będzie większy w dniu 28.05 w stosunku do 21.05. Będziemy wymieniać USD na PLN.
